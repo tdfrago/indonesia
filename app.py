@@ -7,13 +7,13 @@ import json
 SERVICE_ACCOUNT_FILE = 'service_account.json'
 
 try:
+    # Load the client email from the service account JSON
     with open(SERVICE_ACCOUNT_FILE) as f:
         service_account_info = json.load(f)
+    client_email = service_account_info['client_email']
 
-    credentials = ee.ServiceAccountCredentials(
-        service_account_info['client_email'],
-        key_data=service_account_info
-    )
+    # Authenticate with Earth Engine
+    credentials = ee.ServiceAccountCredentials(client_email, SERVICE_ACCOUNT_FILE)
     ee.Initialize(credentials, project='ee-fragotyron')
 except Exception as e:
     st.error(f"❌ Earth Engine initialization failed: {e}")
