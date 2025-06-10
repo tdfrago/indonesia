@@ -1,12 +1,22 @@
 import ee
 import geemap.foliumap as geemap
 import streamlit as st
+import json
 
-# === INIT ===
+# === INIT with service account ===
+SERVICE_ACCOUNT_FILE = 'service_account.json'
+
 try:
-    ee.Initialize(project='ee-fragotyron')
+    with open(SERVICE_ACCOUNT_FILE) as f:
+        service_account_info = json.load(f)
+
+    credentials = ee.ServiceAccountCredentials(
+        service_account_info['client_email'],
+        key_data=service_account_info
+    )
+    ee.Initialize(credentials, project='ee-fragotyron')
 except Exception as e:
-    st.error(f"Earth Engine initialization failed: {e}")
+    st.error(f"❌ Earth Engine initialization failed: {e}")
     st.stop()
 
 # === Load datasets ===
@@ -22,14 +32,12 @@ lc_1985 = five_year.mosaic().select("b1").clip(indonesia)
 lc_2022 = annual.mosaic().select("b23").clip(indonesia)
 
 # === Class remapping: Fine class to Basic class values ===
-# Map basic classes to integer IDs
 basic_class_ids = {
     'Cropland': 1, 'Forest': 2, 'Shrubland': 3, 'Grassland': 4, 'Tundra': 5,
     'Wetland': 6, 'Impervious surface': 7, 'Bare areas': 8,
     'Water body': 9, 'Permanent snow and ice': 10
 }
 
-# Original fine class to basic class name
 fine_to_basic_name = {
     10: 'Cropland', 11: 'Cropland', 12: 'Cropland', 20: 'Cropland',
     51: 'Forest', 52: 'Forest', 61: 'Forest', 62: 'Forest',
@@ -45,15 +53,13 @@ fine_to_basic_name = {
     210: 'Water body', 220: 'Permanent snow and ice'
 }
 
-# Build remap lists
 from_classes = list(fine_to_basic_name.keys())
 to_classes = [basic_class_ids[fine_to_basic_name[c]] for c in from_classes]
 
-# Remap images to basic classes
 lc_1985_basic = lc_1985.remap(from_classes, to_classes)
 lc_2022_basic = lc_2022.remap(from_classes, to_classes)
 
-# === Define color palette for 10 basic classes ===
+# === Visualization parameters ===
 basic_palette = [
     '#ffff64',  # Cropland
     '#4c7300',  # Forest
@@ -67,22 +73,17 @@ basic_palette = [
     '#dcdcdc'   # Snow/Ice
 ]
 
-# === Visualization parameters ===
 basic_vis_params = {'min': 1, 'max': 10, 'palette': basic_palette}
 
-# === Create and display map ===
+# === Streamlit UI ===
 st.subheader("Land Cover Change in Indonesia (1985 vs 2022)")
 
-# Create a geemap.Map object centered over Indonesia
 Map = geemap.Map(center=[-2.5, 118], zoom=5, basemap='HYBRID')
-
-# Split map for 1985 and 2022 basic land cover
 Map.split_map(
     geemap.ee_tile_layer(lc_1985_basic, basic_vis_params, 'LC 1985 (Basic)'),
     geemap.ee_tile_layer(lc_2022_basic, basic_vis_params, 'LC 2022 (Basic)')
 )
 
-# Add legend
 legend_dict = {
     'Cropland': '#ffff64',
     'Forest': '#4c7300',
@@ -97,10 +98,8 @@ legend_dict = {
 }
 Map.add_legend(title="Basic Land Cover Classes", legend_dict=legend_dict)
 
-# Display the map in Streamlit
 Map.to_streamlit()
 
-# === Application Title and Description ===
 st.title("Land Cover Change in Indonesia")
 st.markdown("""
 This application visualizes the basic land cover change in Indonesia between 1985 and 2022
